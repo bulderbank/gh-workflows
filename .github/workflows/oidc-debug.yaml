@@ -1,0 +1,28 @@
+name: Debug GitHub OIDC token
+on:
+  workflow_call:
+    secrets:
+      github_pat:
+        required: true
+
+jobs:
+  oidc-debug:
+    name: get secret manager secrets
+    runs-on: ubuntu-latest
+    permissions:
+      contents: 'read'
+      id-token: 'write'
+
+    steps:
+      - name: Checkout actions-oidc-debugger
+        uses: actions/checkout@v3
+        with:
+          repository: github/actions-oidc-debugger
+          ref: main
+          token: ${{ secrets.github_pat }}
+          path: ./.github/actions/actions-oidc-debugger
+      - name: Debug OIDC Claims
+        uses: ./.github/actions/actions-oidc-debugger
+        with:
+          audience: 'https://github.com/github'
+
