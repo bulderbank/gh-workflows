@@ -1,9 +1,6 @@
 name: Debug GitHub OIDC token
 on:
   workflow_call:
-    secrets:
-      github_pat:
-        required: true
 
 jobs:
   oidc-debug:
@@ -19,7 +16,7 @@ jobs:
         with:
           repository: github/actions-oidc-debugger
           ref: main
-          token: ${{ secrets.github_pat }}
+          token: ${{ secrets.BULDERBOT_PAT }}
           path: ./.github/actions/actions-oidc-debugger
       - name: Debug OIDC Claims
         uses: ./.github/actions/actions-oidc-debugger
