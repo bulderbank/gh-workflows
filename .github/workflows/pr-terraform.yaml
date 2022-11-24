@@ -89,18 +89,6 @@ jobs:
         workload_identity_provider: ${{ inputs.workload-identity-provider }}
         service_account: ${{ inputs.service-account }}
 
-    - name: DEBUG Checkout actions-oidc-debugger
-      uses: actions/checkout@v3
-      with:
-        repository: github/actions-oidc-debugger
-        ref: main
-        token: ${{ secrets.github-pat }}
-        path: ./.github/actions/actions-oidc-debugger
-    - name: DEBUG OIDC Claims
-      uses: ./.github/actions/actions-oidc-debugger
-      with:
-        audience: 'https://github.com/github'
-
     - if: ${{ inputs.github-username != '' &&  steps.helper.outputs.action != '' }}
       run: |
         git config \
