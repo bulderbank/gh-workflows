@@ -38,7 +38,7 @@ jobs:
     - id: changed-files
       uses: tj-actions/changed-files@8a7336fb6f6bc00da867b745d3491de42ac0231b  # v34.4.4
       with:
-        sha: ${{ github.event.pull_request.merged && github.sha || github.event.pull_request.head.sha}}
+        sha: ${{ github.event.pull_request.merged && github.sha || github.event.pull_request.head.sha }}
         base_sha: ${{ github.event.pull_request.base.sha }}
         dir_names: true
         json: true
@@ -49,10 +49,10 @@ jobs:
         DIFF_DIRS="${{ steps.changed-files.outputs.all_modified_files }}"
 
         if [ -z $(echo $DIFF_DIRS | jq '.[] | select(contains("modules/"))') ]; then
-          # ./modules has not been modified, return modified dirs under ./live
+          # ./modules has not been modified; return modified dirs under ./live
           DIFF_DIRS=$(echo $DIFF_DIRS | jq '.[] | select(contains("live/"))')
         else
-          # ./modules has been modified, return all dirs under ./live
+          # ./modules has been modified; return all dirs under ./live
           DIFF_DIRS=$(echo live/*)
         fi
 
@@ -65,21 +65,21 @@ jobs:
           fi
         done
 
-        # Output terraform action (apply on merge, plan if not)
+        # Output terraform plan/apply directories
+        echo "tf-dirs=$(echo $TF_DIRS | tr -d '"')" >> $GITHUB_OUTPUT
+
+        # Output terraform action (plan if PR is active, apply if PR is merged)
         if [[ $TF_DIRS != "" && ${{ github.base_ref }} == "main" ]]; then
           echo "action=${{ github.event.pull_request.merged && 'apply' || 'plan' }}" >> $GITHUB_OUTPUT
         fi
 
-        # Output dirs to run terraform commands against
-        echo "tf-dirs=$(echo $TF_DIRS | tr -d '"')" >> $GITHUB_OUTPUT
-
-        # Output commit SHA
+        # Output commit SHA (for PR conversation)
         echo "short-sha=$(git rev-parse HEAD | cut -c1-7)" >> $GITHUB_OUTPUT
 
-        # Output URL of the GitHub Actions Run
+        # Output URL of the GitHub Actions Run (for PR conversation)
         echo "run-url=https://github.com/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID" >> $GITHUB_OUTPUT
 
-        # Output the path to checked out repository
+        # Output the path to checked out repository (for convenience later)
         echo "checkout-dir=$(pwd)" >> $GITHUB_OUTPUT
 
 
@@ -91,6 +91,7 @@ jobs:
 
     - if: ${{ inputs.github-username != '' &&  steps.helper.outputs.action != '' }}
       run: |
+        # Cloud functions using golang need this to access private GitHub repositories
         git config \
           --global url."https://${{ inputs.github-username }}:${{ secrets.github-pat }}@github.com".insteadOf "https://github.com"
 
