@@ -46,7 +46,7 @@ jobs:
     - id: helper
       run: |
         # Determine what dirs need terraform plan / apply
-        DIFF_DIRS="${{ steps.changed-files.outputs.all_modified_files }}"
+        DIFF_DIRS="${{ steps.changed-files.outputs.all_modified_files == "[\"live\"]" && "[\"live/\"]" || steps.changed-files.outputs.all_modified_files }}"
 
         if [ -z $(echo $DIFF_DIRS | jq '.[] | select(contains("modules/"))') ]; then
           # ./modules has not been modified; return modified dirs under ./live
