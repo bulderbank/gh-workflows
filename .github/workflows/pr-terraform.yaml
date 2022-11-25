@@ -1,0 +1,205 @@
+name: Terraform PR workflow
+on:
+  workflow_call:
+    inputs:
+      workload-identity-provider:
+        required: true
+        type: string
+      service-account:
+        required: true
+        type: string
+      tf-version:
+        required: true
+        type: string
+      github-username:
+        required: false
+        type: string
+      ignore-dirs:
+        default: ""
+        type: string
+      cache:
+        default: ""
+        type: string
+    secrets:
+      github-pat:
+        required: true
+
+jobs:
+  pr-terraform:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+    - uses: actions/checkout@v3
+      with:
+        ref: ${{ github.event.pull_request.merged && 'main' || github.head_ref }}
+
+    - id: changed-files
+      uses: tj-actions/changed-files@8a7336fb6f6bc00da867b745d3491de42ac0231b  # v34.4.4
+      with:
+        sha: ${{ github.event.pull_request.merged && github.sha || github.event.pull_request.head.sha }}
+        base_sha: ${{ github.event.pull_request.base.sha }}
+        dir_names: true
+        json: true
+
+    - id: helper
+      run: |
+        # Determine what dirs need terraform plan / apply
+        DIFF_DIRS="${{ steps.changed-files.outputs.all_modified_files }}"
+
+        if [ -z $(echo $DIFF_DIRS | jq '.[] | select(contains("modules/"))') ]; then
+          # ./modules has not been modified; return modified dirs under ./live
+          DIFF_DIRS=$(echo $DIFF_DIRS | jq '.[] | select(contains("live/"))')
+        else
+          # ./modules has been modified; return all dirs under ./live
+          DIFF_DIRS=$(echo live/*)
+        fi
+
+        # Prevent ignored directories from being included among outputs
+        TF_DIRS=""
+        IGNORE_DIRS=$(echo "${{ inputs.ignore-dirs }}" | tr " " "\n")
+        for DIR in $(echo "$DIFF_DIRS"); do
+          if ! $(echo "$IGNORE_DIRS" | grep -q "$DIR" ) ; then
+            TF_DIRS="$TF_DIRS $DIR"
+          fi
+        done
+
+        # Output terraform plan/apply directories
+        echo "tf-dirs=$(echo $TF_DIRS | tr -d '"')" >> $GITHUB_OUTPUT
+
+        # Output terraform action (plan if PR is active, apply if PR is merged)
+        if [[ $TF_DIRS != "" && ${{ github.base_ref }} == "main" ]]; then
+          echo "action=${{ github.event.pull_request.merged && 'apply' || 'plan' }}" >> $GITHUB_OUTPUT
+        fi
+
+        # Output commit SHA (for PR conversation)
+        echo "short-sha=$(git rev-parse HEAD | cut -c1-7)" >> $GITHUB_OUTPUT
+
+        # Output URL of the GitHub Actions Run (for PR conversation)
+        echo "run-url=https://github.com/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID" >> $GITHUB_OUTPUT
+
+        # Output the path to checked out repository (for convenience later)
+        echo "checkout-dir=$(pwd)" >> $GITHUB_OUTPUT
+
+
+    - uses: google-github-actions/auth@v1
+      if: ${{ steps.helper.outputs.action != '' }}
+      with:
+        workload_identity_provider: ${{ inputs.workload-identity-provider }}
+        service_account: ${{ inputs.service-account }}
+
+    - if: ${{ inputs.github-username != '' &&  steps.helper.outputs.action != '' }}
+      run: |
+        # Cloud functions using golang need this to access private GitHub repositories
+        git config \
+          --global url."https://${{ inputs.github-username }}:${{ secrets.github-pat }}@github.com".insteadOf "https://github.com"
+
+    - if: ${{ inputs.cache != '' && steps.helper.outputs.action != '' }}
+      uses: actions/cache@v2
+      with:
+        path: ${{ fromJSON(inputs.cache).path }}
+        key: ${{ fromJSON(inputs.cache).key }}
+        restore-keys: |
+          ${{ fromJSON(inputs.cache).restore-keys }}
+
+    - uses: hashicorp/setup-terraform@v2
+      if: ${{ steps.helper.outputs.action != '' }}
+      with:
+        terraform_version: ${{ inputs.tf-version }}
+
+    - name: Terraform init
+      if: ${{ steps.helper.outputs.action != '' }}
+      env:
+        DIRS: ${{ steps.helper.outputs.tf-dirs }}
+      run: |
+        for DIR in $DIRS; do
+          cd $DIR
+          echo "Running terraform init @ $DIR"
+          terraform init -reconfigure
+          cd ${{ steps.helper.outputs.checkout-dir }}
+        done
+
+    - name: Terraform plan
+      if: ${{ steps.helper.outputs.action == 'plan' }}
+      env:
+        DIRS: ${{ steps.helper.outputs.tf-dirs }}
+      run: |
+        for DIR in $DIRS; do
+          cd $DIR
+          echo "Running terraform fmt @ $DIR"
+          terraform fmt -recursive -check
+          echo "Running terraform validate @ $DIR"
+          terraform validate
+
+          echo "Terraform Plan @ $DIR" >> /tmp/output.txt
+          terraform plan -lock=false -out plan
+          echo "\n\n\n"
+          (terraform show plan -no-color | grep -E '^Plan|^No changes') >> /tmp/output.txt
+          echo "\n" >> /tmp/output.txt
+          cd ${{ steps.helper.outputs.checkout-dir }}
+
+          echo "TF_PLAN<<EOF" >> $GITHUB_ENV
+          echo "$(sed '$d' /tmp/output.txt | grep -vE '(::|\[command\])')" >> $GITHUB_ENV
+          echo "EOF" >> $GITHUB_ENV
+        done
+
+    - name: Post plan in PR
+      if: ${{ steps.helper.outputs.action == 'plan' }}
+      uses: actions/github-script@v6
+      with:
+        github-token: ${{ secrets.github-pat }}
+        script: |
+          const output = `
+          Plan summary (${{ steps.helper.outputs.short-sha }}):
+          \`\`\`hcl\n
+          ${{ env.TF_PLAN }}
+          \`\`\`
+          For full plan output, please see the <a href="${{ steps.helper.outputs.run-url }}">workflow summary.</a>`;
+          github.rest.issues.createComment({
+            issue_number: context.issue.number,
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            body: output
+          })
+
+    - name: Terraform apply
+      if: ${{ steps.helper.outputs.action == 'apply' }}
+      env:
+        DIRS: ${{ steps.helper.outputs.tf-dirs }}
+      run: |
+        rm -rf /tmp/output.txt
+        for DIR in $DIRS; do
+          cd $DIR
+          echo "Terraform Apply @ $DIR" >> /tmp/output.txt
+          set -o pipefail
+          terraform apply -auto-approve -no-color | tee apply.txt
+          set +o pipefail
+          echo "\n\n\n"
+          cat apply.txt | grep -E '^Apply complete' >> /tmp/output.txt
+          echo "\n" >> /tmp/output.txt
+          cd ${{ steps.helper.outputs.checkout-dir }}
+        done
+        echo "TF_APPLY<<EOF" >> $GITHUB_ENV
+        echo "$(sed '$d' /tmp/output.txt | grep -vE '(::|\[command\])')" >> $GITHUB_ENV
+        echo "EOF" >> $GITHUB_ENV
+
+    - name: Post apply output in PR
+      if: ${{ steps.helper.outputs.action == 'apply' }}
+      uses: actions/github-script@v6
+      with:
+        github-token: ${{ secrets.github-pat }}
+        script: |
+          const output = `
+          Apply summary (${{ steps.helper.outputs.short-sha }}):
+          \`\`\`hcl\n
+          ${{ env.TF_APPLY }}
+          \`\`\`
+          For full apply output, please see the <a href="${{ steps.helper.outputs.run-url }}">workflow summary.</a>`;
+          github.rest.issues.createComment({
+            issue_number: context.issue.number,
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            body: output
+          })
+
