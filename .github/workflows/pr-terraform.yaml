@@ -50,7 +50,7 @@ jobs:
 
         if [ -z $(echo $DIFF_DIRS | jq '.[] | select(contains("modules/"))') ]; then
           # ./modules has not been modified; return modified dirs under ./live
-          DIFF_DIRS=$(echo $DIFF_DIRS | jq '.[] | select(contains("live/"))')
+          DIFF_DIRS=$(echo $DIFF_DIRS | jq '.[] | select(contains("live"))')
         else
           # ./modules has been modified; return all dirs under ./live
           DIFF_DIRS=$(echo live/*)
