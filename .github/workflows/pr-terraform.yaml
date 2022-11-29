@@ -62,7 +62,7 @@ jobs:
 
         if [[ "$GLOBAL_DIRS_MODIFIED" == "true" ]]; then
           # Return all dirs under live/
-          DIFF_DIRS=$(echo ~/Projects/bulder/cloud-setup/live/*)
+          DIFF_DIRS=$(echo live/*)
         else
           # Return subdirs under live/ modified by the pull request
           DIFF_DIRS=$(echo $DIFF_DIRS | jq '.[] | select(contains("live"))')
