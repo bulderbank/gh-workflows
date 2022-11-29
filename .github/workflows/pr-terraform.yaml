@@ -50,7 +50,7 @@ jobs:
       run: |
         # Determine what dirs need terraform plan / apply
         DIFF_DIRS="${{ steps.changed-files.outputs.all_modified_files }}"
-        GLOBAL_DIRS=${{ inputs.global-dirs | tr " " "\n" }}
+        GLOBAL_DIRS=$(echo "${{ inputs.global-dirs }}" | tr " " "\n")
 
         # Check if any GLOBAL_DIRS have been modified
         GLOBAL_DIRS_MODIFIED=false
