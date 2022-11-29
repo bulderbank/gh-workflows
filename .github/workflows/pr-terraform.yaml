@@ -12,10 +12,13 @@ on:
         required: true
         type: string
       github-username:
-        required: false
+        default: ""
         type: string
       ignore-dirs:
         default: ""
+        type: string
+      global-dirs:
+        default: modules/
         type: string
       cache:
         default: ""
@@ -47,13 +50,22 @@ jobs:
       run: |
         # Determine what dirs need terraform plan / apply
         DIFF_DIRS="${{ steps.changed-files.outputs.all_modified_files }}"
+        GLOBAL_DIRS=$(echo "${{ inputs.global-dirs }}" | tr " " "\n")
 
-        if [ -z $(echo $DIFF_DIRS | jq '.[] | select(contains("modules/"))') ]; then
-          # ./modules has not been modified; return modified dirs under ./live
-          DIFF_DIRS=$(echo $DIFF_DIRS | jq '.[] | select(contains("live"))')
-        else
-          # ./modules has been modified; return all dirs under ./live
+        # Check if any GLOBAL_DIRS have been modified
+        GLOBAL_DIRS_MODIFIED=false
+        for DIR in $(echo $GLOBAL_DIRS); do
+          if [[ $(echo $DIFF_DIRS | jq ". | map(contains(\"$DIR\")) | any(.)") == "true" ]]; then
+            GLOBAL_DIRS_MODIFIED=true
+          fi
+        done
+
+        if [[ "$GLOBAL_DIRS_MODIFIED" == "true" ]]; then
+          # Return all dirs under live/
           DIFF_DIRS=$(echo live/*)
+        else
+          # Return subdirs under live/ modified by the pull request
+          DIFF_DIRS=$(echo $DIFF_DIRS | jq '.[] | select(contains("live"))')
         fi
 
         # Prevent ignored directories from being included among outputs
