@@ -108,7 +108,7 @@ jobs:
           --global url."https://${{ inputs.github-username }}:${{ secrets.github-pat }}@github.com".insteadOf "https://github.com"
 
     - if: ${{ inputs.cache != '' && steps.helper.outputs.action != '' }}
-      uses: actions/cache@v2
+      uses: actions/cache@v3
       with:
         path: ${{ fromJSON(inputs.cache).path }}
         key: ${{ fromJSON(inputs.cache).key }}
