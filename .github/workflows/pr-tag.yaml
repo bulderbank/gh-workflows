@@ -1,0 +1,30 @@
+name: GitHub Tag PR workflow
+on:
+  workflow_call:
+    secrets:
+      github-pat:
+        required: true
+    outputs:
+      new-tag:
+        value: ${{ jobs.pr-tag.outputs.new-tag }}
+
+jobs:
+  pr-tag:
+    runs-on: ubuntu-latest
+    outputs:
+      new-tag: ${{ steps.tag.outputs.new_tag }}
+    steps:
+    - uses: actions/checkout@v3
+    - id: tag
+      uses: mathieudutour/github-tag-action@fcfbdceb3093f6d85a3b194740f8c6cec632f4e2
+      with:
+        github_token: ${{ secrets.github-pat }}
+        dry_run: true
+
+    # We have had a lot of trouble with the various GitHub tagging actions being buggy,
+    # so we just use one to calculate the next semver tag, then we apply it manually
+    - name: Perform tagging
+      run: |
+        git tag ${{ steps.tag.outputs.new_tag }} main
+        git push origin --tags
+
