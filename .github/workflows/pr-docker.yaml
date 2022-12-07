@@ -1,0 +1,100 @@
+name: Docker PR workflow
+on:
+  workflow_call:
+    inputs:
+      workload-identity-provider:
+        required: true
+        type: string
+      service-account:
+        required: true
+        type: string
+      repo-ref:
+        default: ""
+        type: string
+      image:
+        required: true
+        type: string
+      tag:
+        required: true
+        type: string
+      cache-tag:
+        default: latest
+        type: string
+      tag-latest:
+        default: false
+        type: boolean
+      build-args:
+        default: ""
+        type: string
+      clean-registry:
+        default: true
+        type: boolean
+
+jobs:
+  pr-docker:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+    - uses: actions/checkout@v3
+      with:
+        ref: ${{ inputs.repo-ref }}
+    - uses: google-github-actions/auth@v1
+      with:
+        workload_identity_provider: ${{ inputs.workload-identity-provider }}
+        service_account: ${{ inputs.service-account }}
+    - uses: google-github-actions/setup-gcloud@v1
+    - run: gcloud auth configure-docker
+    - uses: docker/setup-buildx-action@v2
+    - uses: docker/build-push-action@v3
+      with:
+        context: .
+        push: true
+        tags: |
+          ${{ inputs.image }}:${{ inputs.tag }}
+          ${{ inputs.tag-latest && format('{0}:latest', inputs.image) || '' }}
+        cache-to: type=inline,mode=max
+        cache-from: type=registry,ref=${{ inputs.image }}:${{ inputs.cache-tag }}
+        build-args: |
+          ${{ inputs.build-args }}
+
+    - name: Remove old images from Google Container Registry
+      if: ${{ inputs.clean-registry && github.event.action == 'closed' }}
+      run: |
+        # Remove the PR container tag
+        gcloud container images untag \
+          ${{ inputs.image }}:${{ format('PR{0}', github.event.number) }} \
+          --quiet
+
+        # Remove old semver tags (keep the 10 latest tags)
+        SEMVER_TAGS="$(
+          gcloud container images list-tags \
+            ${{ inputs.image }} \
+            --format=json | \
+              jq -r '.[].tags' | \
+              grep -Eo 'v[[:digit:]]+\.[[:digit:]]+\.[[:digit:]]+' |
+              sort -rV
+        )"
+
+        if [ $(echo "$SEMVER_TAGS" | wc -l) -gt 10 ]; then
+          for TAG in $(echo "$SEMVER_TAGS" | tail -n +11); do
+            gcloud container images untag \
+              ${{ inputs.image }}:"$TAG" \
+              --quiet
+          done
+        fi
+
+        # Delete untagged container images
+        for UNTAGGED_IMAGE_DIGEST in $(
+          gcloud container images list-tags \
+            ${{ inputs.image }} \
+            --filter='NOT tags:*' \
+            --format=json | \
+            jq -r '.[].digest'
+        ); do
+          gcloud container images delete \
+            ${{ inputs.image }}@$UNTAGGED_IMAGE_DIGEST \
+            --quiet
+        done
+

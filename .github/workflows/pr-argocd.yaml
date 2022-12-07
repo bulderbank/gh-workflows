@@ -1,0 +1,87 @@
+name: ArgoCD PR workflow
+on:
+  workflow_call:
+    inputs:
+      workload-identity-provider:
+        required: true
+        type: string
+      service-account:
+        required: true
+        type: string
+      environment:
+        required: true
+        type: string
+      argocd-secret:
+        required: true
+        type: string
+      application:
+        required: true
+        type: string
+      image-tag:
+        required: true
+        type: string
+    secrets:
+      github-pat:
+        required: true
+
+env:
+  ARGOCD_VERSION: v2.5.1
+
+jobs:
+  pr-argocd:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+    strategy:
+      matrix:
+        environment: ${{ fromJSON(inputs.environment) }}
+    steps:
+      - uses: actions/checkout@v3
+      - uses: google-github-actions/auth@v1
+        with:
+          workload_identity_provider: ${{ inputs.workload-identity-provider }}
+          service_account: ${{ inputs.service-account }}
+
+      - id: secret-manager
+        uses: google-github-actions/get-secretmanager-secrets@v1
+        with:
+          secrets: |-
+            payload:${{ inputs.argocd-secret }}
+
+      - run: |
+          # Install ArgoCD CLI
+          curl -sSL -o /usr/local/bin/argocd \
+            https://github.com/argoproj/argo-cd/releases/download/${{ env.ARGOCD_VERSION }}/argocd-linux-amd64
+          chmod +x /usr/local/bin/argocd
+
+      - run: |
+          # ArgoCD login
+          URL=$(echo '${{ steps.secret-manager.outputs.payload }}' | jq -r ".${{ matrix.environment }}_url")
+          PASSWORD=$(echo '${{ steps.secret-manager.outputs.payload }}' | jq -r ".${{ matrix.environment }}_password")
+          argocd login $URL \
+            --username ${{ fromJSON(steps.secret-manager.outputs.payload).username }} \
+            --password $PASSWORD \
+            --grpc-web
+
+      - id: patch
+        run: |
+          # Patch ArgoCD application
+          argocd app patch ${{ inputs.application }} \
+            --type "json" \
+            --patch '[{"op":"replace", "path":"/spec/source/helm/parameters", "value":[{"name":"image.tag", "value":"${{ inputs.image-tag }}"}]}]' \
+            --grpc-web
+
+      - name: Post message in PR conversation
+        uses: actions/github-script@v6.3.3
+        with:
+          github-token: ${{ secrets.github-pat }}
+          script: |
+            const output = "**ArgoCD (${{ matrix.environment }}):** The \`${{ inputs.application }}\` application has been patched to use container tag \`${{ inputs.image-tag }}\`.";
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: output
+            })
+
