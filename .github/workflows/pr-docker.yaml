@@ -29,6 +29,9 @@ on:
       clean-registry:
         default: true
         type: boolean
+    secrets:
+      build-args:
+        required: false
 
 jobs:
   pr-docker:
@@ -58,6 +61,7 @@ jobs:
         cache-from: type=registry,ref=${{ inputs.image }}:${{ inputs.cache-tag }}
         build-args: |
           ${{ inputs.build-args }}
+          ${{ secrets.build-args }}
 
     - name: Remove old images from Google Container Registry
       if: ${{ inputs.clean-registry && github.event.action == 'closed' }}
