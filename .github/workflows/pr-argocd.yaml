@@ -20,6 +20,9 @@ on:
       image-tag:
         required: true
         type: string
+      post-in-pr-conversation:
+        default: true
+        type: boolean
     secrets:
       github-pat:
         required: true
@@ -73,6 +76,7 @@ jobs:
             --grpc-web
 
       - name: Post message in PR conversation
+        if: ${{ inputs.post-in-pr-conversation }}
         uses: actions/github-script@v6.3.3
         with:
           github-token: ${{ secrets.github-pat }}
