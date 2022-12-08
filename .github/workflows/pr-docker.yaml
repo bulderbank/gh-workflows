@@ -27,7 +27,7 @@ on:
         default: ""
         type: string
       clean-registry:
-        default: true
+        default: false
         type: boolean
     secrets:
       build-args:
@@ -64,7 +64,7 @@ jobs:
           ${{ secrets.build-args }}
 
     - name: Remove old images from Google Container Registry
-      if: ${{ inputs.clean-registry && github.event.action == 'closed' }}
+      if: ${{ inputs.clean-registry }}
       run: |
         # Remove the PR container tag
         gcloud container images untag \
