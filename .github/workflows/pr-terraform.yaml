@@ -62,7 +62,7 @@ jobs:
 
         if [[ "$GLOBAL_DIRS_MODIFIED" == "true" ]]; then
           # Return all dirs containing .tf files under live/
-          DIFF_DIRS=$(find ./live -type f -name "*.tf" -printf '%h\n' | grep -v '/\.' | sort | uniq)
+          DIFF_DIRS=$(find live -type f -name "*.tf" -printf '%h\n' | grep -v '/\.' | sort | uniq)
         else
           # Return subdirs under live/ modified by the pull request
           DIFF_DIRS=$(echo $DIFF_DIRS | jq '.[] | select(contains("live"))')
