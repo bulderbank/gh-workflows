@@ -1,0 +1,53 @@
+name: Golang Tests PR workflow
+on:
+  workflow_call:
+    inputs:
+      workload-identity-provider:
+        required: false
+        type: string
+      service-account:
+        required: false
+        type: string
+      go-version:
+        required: true
+        type: string
+      integration-test:
+        default: false
+        type: boolean
+    secrets:
+      github-pat:
+        required: true
+      sonar-cloud-token:
+        required: true
+jobs:
+  pr-bulder-golang-tests:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          ref: ${{ github.head_ref }}
+      - uses: google-github-actions/auth@v1
+        if: ${{ inputs.intergration-test }}
+        with:
+          workload_identity_provider: ${{ inputs.workload-identity-provider }}
+          service_account: ${{ inputs.service-account }}
+      - uses: actions/setup-go@v3
+        with:
+          go-version: ${{ inputs.go-version }}
+      - id: helper
+        run: |
+          echo "go-cache-path=$(go env GOCACHE)" >> $GITHUB_OUTPUT
+          GO_MODCACHE=$(go env GOMODCACHE)
+          if [ -z GO_MODCACHE ]; then
+          # For Go < v1.15
+            GO_MODCACHE="~/go/pkg/mod"
+          fi
+          echo "go-modcache-path=$GO_MODCACHE" >> $GITHUB_OUTPUT
+      - uses: actions/cache@v3
+        with:
+          path: ${{ steps.helper.outputs.go-cache-path }}
+          key: ${{ runner.os}}-go-mod-${{ github.event.repository.name }}
+
