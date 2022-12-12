@@ -1,0 +1,85 @@
+name: Golang Tests PR workflow
+on:
+  workflow_call:
+    inputs:
+      workload-identity-provider:
+        required: false
+        type: string
+      service-account:
+        required: false
+        type: string
+      go-version:
+        required: true
+        type: string
+      github-username:
+        default: ""
+        type: string
+      integration-test:
+        default: false
+        type: boolean
+      integration-test-firebase-id:
+        default: ""
+        type: string
+    secrets:
+      github-pat:
+        required: false
+      sonar-cloud-token:
+        required: true
+jobs:
+  pr-bulder-golang-tests:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          ref: ${{ github.head_ref }}
+      - uses: actions/setup-go@v3
+        with:
+          go-version: ${{ inputs.go-version }}
+      - id: helper
+        run: |
+          echo "go-cache-path=$(go env GOCACHE)" >> $GITHUB_OUTPUT
+          GO_MODCACHE=$(go env GOMODCACHE)
+          if [ -z GO_MODCACHE ]; then
+            GO_MODCACHE="~/go/pkg/mod"  # For Go < v1.15
+          fi
+          echo "go-modcache-path=$GO_MODCACHE" >> $GITHUB_OUTPUT
+      - uses: actions/cache@v3
+        with:
+          path: ${{ steps.helper.outputs.go-cache-path }}
+          key: ${{ runner.os }}-go-cache-${{ github.event.repository.name }}-${{ hashFiles('**/go.sum') }}
+      - uses: actions/cache@v3
+        with:
+          path: ${{ steps.helper.outputs.go-modcache-path }}
+          key: ${{ runner.os }}-go-modcache-${{ github.event.repository.name }}-${{ hashFiles('**/go.sum') }}
+      - if: ${{ inputs.github-username != '' }}
+        run: git config --global url."https://${{ inputs.github-username }}:${{ secrets.github-pat }}@github.com".insteadOf "https://github.com"
+      - run: go test -coverprofile coverage.txt ./src/...
+      - if: ${{ inputs.integration-test }}
+        uses: actions/checkout@v3
+        with:
+          repository: bulderbank/backend-setup
+          path: backend-setup
+          token: ${{ secrets.github-pat }}
+      - uses: google-github-actions/auth@v1
+        if: ${{ inputs.integration-test }}
+        with:
+          workload_identity_provider: ${{ inputs.workload-identity-provider }}
+          service_account: ${{ inputs.service-account }}
+      - if: ${{ inputs.integration-test }}
+        env:
+          EMULATORS_DOCKER_IMAGE: eu.gcr.io/bulder-shared/backend-setup:latest
+        run: |
+          gcloud auth configure-docker
+          docker-compose -f "backend-setup/docker-compose.yml" up -d
+
+          export FIRESTORE_EMULATOR_HOST="localhost:8080"
+          export PUBSUB_EMULATOR_HOST="localhost:8085"
+          export LOG_LEVEL=DBG
+          export GCLOUD_FIREBASE_PROJECT_ID=${{ inputs.integration-test-firebase-id }}
+          export GCLOUD_PROJECT_ID=${{ inputs.integration-test-firebase-id }}
+
+          go test -v -timeout 60s --run TestIntegration_ ./src/...
+
