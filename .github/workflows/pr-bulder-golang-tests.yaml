@@ -72,6 +72,7 @@ jobs:
         env:
           EMULATORS_DOCKER_IMAGE: eu.gcr.io/bulder-shared/backend-setup:latest
         run: |
+          gcloud auth configure-docker
           docker-compose -f "backend-setup/docker-compose.yml" up -d
 
           export FIRESTORE_EMULATOR_HOST="localhost:8080"
