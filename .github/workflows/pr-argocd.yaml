@@ -74,7 +74,6 @@ jobs:
             --patch '[{"op":"replace", "path":"/spec/source/helm/parameters", "value":[{"name":"image.tag", "value":"${{ inputs.image-tag }}"}]}]' \
             --grpc-web
 
-      - run: |
           # Update ArgoCD application label
           argocd app patch ${{ inputs.application }} \
             --type "json" \
