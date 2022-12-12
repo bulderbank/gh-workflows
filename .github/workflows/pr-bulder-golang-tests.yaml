@@ -69,6 +69,8 @@ jobs:
           path: backend-setup
           token: ${{ secrets.github-pat }}
       - if: ${{ inputs.integration-test }}
+        env:
+          EMULATORS_DOCKER_IMAGE: eu.gcr.io/bulder-shared/backend-setup:latest
         run: |
           docker-compose -f "backend-setup/docker-compose.yml" up -d
 
