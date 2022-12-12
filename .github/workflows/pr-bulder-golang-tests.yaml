@@ -59,7 +59,7 @@ jobs:
         with:
           path: ${{ steps.helper.outputs.go-modcache-path }}
           key: ${{ runner.os }}-go-modcache-${{ github.event.repository.name }}-${{ hashFiles('**/go.sum') }}
-      - if: ${{ inputs.github-username != '' && secrets.github-pat != '' }}
+      - if: ${{ inputs.github-username != '' }}
         run: git config --global url."https://${{ inputs.github-username }}:${{ secrets.github-pat }}@github.com".insteadOf "https://github.com"
       - run: go test -coverprofile coverage.txt ./src/...
       - if: ${{ inputs.integration-test }}
