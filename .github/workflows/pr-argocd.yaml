@@ -17,6 +17,9 @@ on:
       application:
         required: true
         type: string
+      image-helm-parameter:
+        default: "bulder-app.image.tag"
+        type: string
       image-tag:
         required: true
         type: string
@@ -72,7 +75,7 @@ jobs:
           # Patch ArgoCD application
           argocd app patch ${{ inputs.application }} \
             --type "json" \
-            --patch '[{"op":"replace", "path":"/spec/source/helm/parameters", "value":[{"name":"image.tag", "value":"${{ inputs.image-tag }}"}]}]' \
+            --patch '[{"op":"replace", "path":"/spec/source/helm/parameters", "value":[{"name":"${{ inputs.image-helm-parameter }}", "value":"${{ inputs.image-tag }}"}]}]' \
             --grpc-web
 
       - name: Post message in PR conversation
