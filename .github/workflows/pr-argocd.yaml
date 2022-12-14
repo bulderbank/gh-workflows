@@ -81,8 +81,11 @@ jobs:
           # Patch ArgoCD application
           argocd app patch ${{ inputs.application }} \
             --type "json" \
-            --patch ${{ toJSON(steps.hack.outputs.patch) }} \
+            --patch ${{ toJSON(inputs.patch) }} \
             --grpc-web
+
+          # Echo for debug purposes
+          echo '${{ inputs.patch }}' | jq .
 
       - name: Post message in PR conversation
         if: ${{ inputs.pr-conversation-message != '' }}
