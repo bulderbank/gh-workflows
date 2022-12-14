@@ -20,7 +20,7 @@ on:
       patch:
         required: true
         type: string
-      pr-conversation-message:
+      message:
         default: true
         type: string
     secrets:
@@ -81,12 +81,12 @@ jobs:
             --grpc-web
 
       - name: Post message in PR conversation
-        if: ${{ inputs.pr-conversation-message != '' }}
+        if: ${{ inputs.message != '' }}
         uses: actions/github-script@v6.3.3
         with:
           github-token: ${{ secrets.github-pat }}
           script: |
-            const output = "**ArgoCD (${{ matrix.environment }}):** ${{ inputs.pr-conversation-message }}";
+            const output = "**ArgoCD (${{ matrix.environment }}):** ${{ inputs.message }}";
             github.rest.issues.createComment({
               issue_number: context.issue.number,
               owner: context.repo.owner,
