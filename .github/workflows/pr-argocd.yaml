@@ -67,15 +67,18 @@ jobs:
             --password $PASSWORD \
             --grpc-web
 
+      - id: hack
+        run: |
+          # Condense the JSON patch to a compact single line string
+          PATCH=$(cat ${{ inputs.patch }} | jq -c .)
+          echo "patch=$PATCH" >> $GITHUB_OUTPUT
+
       -  run: |
           # Patch ArgoCD application
           argocd app patch ${{ inputs.application }} \
             --type "json" \
-            --patch ${{ toJSON(inputs.patch) }} \
+            --patch '${{ steps.hack.outputs.patch }}' \
             --grpc-web
-
-          # Echo for debug purposes
-          echo '${{ inputs.patch }}' | jq .
 
       - name: Post message in PR conversation
         if: ${{ inputs.pr-conversation-message != '' }}
