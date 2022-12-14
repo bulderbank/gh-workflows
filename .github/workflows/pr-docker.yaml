@@ -23,6 +23,9 @@ on:
       tag-latest:
         default: false
         type: boolean
+      extra-tag:
+        default: ""
+        type: string
       build-args:
         default: ""
         type: string
@@ -57,6 +60,7 @@ jobs:
         tags: |
           ${{ inputs.image }}:${{ inputs.tag }}
           ${{ inputs.tag-latest && format('{0}:latest', inputs.image) || '' }}
+          ${{ inputs.extra-tag != '' && format('{0}:{1}', inputs.image, inputs.extra-tag) || '' }}
         cache-to: type=inline,mode=max
         cache-from: type=registry,ref=${{ inputs.image }}:${{ inputs.cache-tag }}
         build-args: |
