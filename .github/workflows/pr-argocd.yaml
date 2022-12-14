@@ -81,7 +81,7 @@ jobs:
         with:
           github-token: ${{ secrets.github-pat }}
           script: |
-            const output = "${{ inputs.pr-conversation-message }}";
+            const output = "**ArgoCD (${{ matrix.environment }}):** ${{ inputs.pr-conversation-message }}";
             github.rest.issues.createComment({
               issue_number: context.issue.number,
               owner: context.repo.owner,
