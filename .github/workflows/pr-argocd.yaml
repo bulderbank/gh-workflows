@@ -70,12 +70,10 @@ jobs:
       - id: patch
         run: |
           # Patch ArgoCD application
-          cat ${{ inputs.patch }} | jq -c '.[]' | while read patch; do
-            argocd app patch ${{ inputs.application }} \
-              --type "json" \
-              --patch "$patch" \
-              --grpc-web
-          done
+          argocd app patch ${{ inputs.application }} \
+            --type "json" \
+            --patch '${{ inputs.patch }}' \
+            --grpc-web
 
       - name: Post message in PR conversation
         if: ${{ inputs.pr-conversation-message != '' }}
