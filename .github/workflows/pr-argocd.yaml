@@ -70,7 +70,7 @@ jobs:
       - id: hack
         run: |
           # Condense the JSON patch to a compact single line string
-          PATCH=$(echo ${{ inputs.patch }} | jq -c .)
+          PATCH=$(echo '${{ inputs.patch }}' | jq -c .)
           echo "patch=$PATCH" >> $GITHUB_OUTPUT
 
       -  run: |
