@@ -40,7 +40,7 @@ jobs:
           # Push Helm chart to GCS registry
           helm repo add ${{ inputs.repo-name }} ${{ inputs.repo-url }}
           helm package .
-          if [[ ${{ inputs.install-gcs-plugin }} == "true" ]];
+          if [[ ${{ inputs.install-gcs-plugin }} == "true" ]]; then
             helm gcs push ${{ inputs.chart-name }}*tgz ${{ inputs.repo-name }}
           else
             helm push ${{ inputs.chart-name }}*tgz ${{ inputs.repo-name }}
