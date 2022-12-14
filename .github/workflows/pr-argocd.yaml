@@ -67,21 +67,21 @@ jobs:
             --password $PASSWORD \
             --grpc-web
 
-      - id: hack
-        run: |
-          # Condense the JSON patch to a compact single line string
-          PATCH=$(cat ${{ inputs.patch }} | jq -c .)
-          echo "patch=$PATCH" >> $GITHUB_OUTPUT
-
-          # debug
-          echo "${{ toJSON(inputs.patch)}}"
-          echo "${{ fromJSON(inputs.patch)}}"
+            #      - id: hack
+            #        run: |
+            #          # Condense the JSON patch to a compact single line string
+            #          PATCH=$(cat ${{ inputs.patch }} | jq -c .)
+            #          echo "patch=$PATCH" >> $GITHUB_OUTPUT
+            #
+            #          # debug
+            #          echo "${{ toJSON(inputs.patch)}}"
+            #          echo "${{ fromJSON(inputs.patch)}}"
 
       -  run: |
           # Patch ArgoCD application
           argocd app patch ${{ inputs.application }} \
             --type "json" \
-            --patch '${{ steps.hack.outputs.patch }}' \
+            --patch ${{ toJSON(steps.hack.outputs.patch) }} \
             --grpc-web
 
       - name: Post message in PR conversation
