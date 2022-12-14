@@ -72,7 +72,7 @@ jobs:
           # Patch ArgoCD application
           argocd app patch ${{ inputs.application }} \
             --type "json" \
-            --patch '${{ fromJSON(inputs.patch) }}' \
+            --patch '${{ toJSON(inputs.patch) }}' \
             --grpc-web
 
       - name: Post message in PR conversation
