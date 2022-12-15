@@ -17,15 +17,12 @@ on:
       application:
         required: true
         type: string
-      image-helm-parameter:
-        default: "bulder-app.image.tag"
-        type: string
-      image-tag:
+      patch:
         required: true
         type: string
-      post-in-pr-conversation:
+      message:
         default: true
-        type: boolean
+        type: string
     secrets:
       github-pat:
         required: true
@@ -70,21 +67,26 @@ jobs:
             --password $PASSWORD \
             --grpc-web
 
-      - id: patch
+      - id: hack
         run: |
+          # Condense the JSON patch to a compact single line string
+          PATCH=$(echo '${{ inputs.patch }}' | jq -c .)
+          echo "patch=$PATCH" >> $GITHUB_OUTPUT
+
+      -  run: |
           # Patch ArgoCD application
           argocd app patch ${{ inputs.application }} \
             --type "json" \
-            --patch '[{"op":"replace", "path":"/spec/source/helm/parameters", "value":[{"name":"${{ inputs.image-helm-parameter }}", "value":"${{ inputs.image-tag }}"}]}]' \
+            --patch '${{ steps.hack.outputs.patch }}' \
             --grpc-web
 
       - name: Post message in PR conversation
-        if: ${{ inputs.post-in-pr-conversation }}
+        if: ${{ inputs.message != '' }}
         uses: actions/github-script@v6.3.3
         with:
           github-token: ${{ secrets.github-pat }}
           script: |
-            const output = "**ArgoCD (${{ matrix.environment }}):** The \`${{ inputs.application }}\` application has been patched to use container tag \`${{ inputs.image-tag }}\`.";
+            const output = "**ArgoCD (${{ matrix.environment }}):** ${{ inputs.message }}";
             github.rest.issues.createComment({
               issue_number: context.issue.number,
               owner: context.repo.owner,
