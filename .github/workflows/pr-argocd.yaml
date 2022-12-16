@@ -21,7 +21,7 @@ on:
         required: true
         type: string
       message:
-        default: true
+        default: ""
         type: string
     secrets:
       github-pat:
